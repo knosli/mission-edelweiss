@@ -865,6 +865,18 @@
       <div id="boardList" style="margin-top:18px;"></div>
     </div>
 
+    <div class="section-label" id="manualPointsLabel" style="display:none;">Bonuspunkte vergeben</div>
+    <div class="packlist" id="manualPointsCard" style="display:none;">
+      <div class="locked-hint" style="margin-bottom:14px;">Für physische Spiele, Wetten oder spontane Aktionen abseits der App.</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <select id="mpUser" style="padding:12px; border-radius:10px; border:1px solid var(--brass-dim); background:rgba(255,255,255,0.04); color:var(--text-hi); font-family:'JetBrains Mono',monospace;"></select>
+        <input id="mpPoints" type="number" placeholder="Punkte (z.B. 5 oder -2)" style="padding:12px; border-radius:10px; border:1px solid var(--brass-dim); background:rgba(255,255,255,0.04); color:var(--text-hi); font-family:'JetBrains Mono',monospace;">
+        <input id="mpReason" type="text" placeholder="Grund (z.B. Jassen gewonnen)" style="padding:12px; border-radius:10px; border:1px solid var(--brass-dim); background:rgba(255,255,255,0.04); color:var(--text-hi); font-family:'JetBrains Mono',monospace;">
+        <button class="wait-game-btn" style="width:100%; text-align:center;" onclick="submitManualPoints()">➕ Punkte vergeben</button>
+      </div>
+      <div id="mpLog" style="margin-top:16px;"></div>
+    </div>
+
     <div class="section-label">Fotowand</div>
     <div class="packlist" id="galleryCard">
       <div class="locked-hint" style="margin-bottom:14px;">Alle Aufgaben-Fotos der Truppe — durchwischen oder Pfeile nutzen.</div>
@@ -1485,6 +1497,7 @@ function finishLogin(){
   loadGallery();
   tagOneSignalUser(currentUser);
   requestOneSignalPermission();
+  initManualPointsForm();
 }
 
 document.getElementById('logoutBtn').addEventListener('click', logout);
@@ -1497,7 +1510,7 @@ function switchTab(tabId, scroll){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id === tabId));
   try{ localStorage.setItem('activeTab', tabId); }catch(e){}
   if(scroll !== false) window.scrollTo({ top:0, behavior:'smooth' });
-  if(tabId === 'tabBoard'){ loadLeaderboard(); loadGallery(); }
+  if(tabId === 'tabBoard'){ loadLeaderboard(); loadGallery(); loadManualPointsLog(); }
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -1602,6 +1615,12 @@ async function loadLeaderboard(){
     points[t.user_name] = (points[t.user_name] || 0) + (DIFF_POINTS[t.difficulty] || 1);
   });
 
+  // Manuell vergebene Bonuspunkte (z.B. physische Spiele) — zählen sofort, keine Sperrfrist
+  const { data: manualData } = await sb.from('manual_points').select('user_name,points');
+  (manualData || []).forEach(row => {
+    if(points[row.user_name] !== undefined) points[row.user_name] += row.points;
+  });
+
   // Spiele-Bonus: pro Spiel (Space Invaders, Snake, Pac-Man) 5/4/3/2/1 nach Rang
   // Wird erst ab Sonntag 17:00 Uhr in die Rangliste eingerechnet — vorher bleibt's spannend
   const GAME_BONUS_REVEAL = new Date("2026-08-30T19:00:00");
@@ -1656,6 +1675,73 @@ async function loadLeaderboard(){
 }
 
 setInterval(()=>{ if(currentUser) loadLeaderboard(); }, 15000);
+
+/* ---------- Manuelle Bonuspunkte ---------- */
+function initManualPointsForm(){
+  const label = document.getElementById('manualPointsLabel');
+  const card = document.getElementById('manualPointsCard');
+  const isKnotz = typeof currentUser !== 'undefined' && currentUser === 'Knotz';
+  if(label) label.style.display = isKnotz ? '' : 'none';
+  if(card) card.style.display = isKnotz ? '' : 'none';
+  if(!isKnotz) return;
+
+  const sel = document.getElementById('mpUser');
+  if(!sel || sel.options.length > 0) return; // schon befüllt
+  AGENTS.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a; opt.textContent = a;
+    sel.appendChild(opt);
+  });
+}
+initManualPointsForm();
+
+async function submitManualPoints(){
+  if(typeof currentUser === 'undefined' || currentUser !== 'Knotz'){
+    alert('Nur Knotz kann Bonuspunkte vergeben.');
+    return;
+  }
+  const user = document.getElementById('mpUser').value;
+  const ptsRaw = document.getElementById('mpPoints').value;
+  const reason = document.getElementById('mpReason').value.trim();
+  const pts = parseInt(ptsRaw, 10);
+
+  if(!user || isNaN(pts) || pts === 0){
+    alert('Bitte Person auswählen und eine gültige Punktzahl (z.B. 5 oder -2) eingeben.');
+    return;
+  }
+
+  try{
+    await sb.from('manual_points').insert({
+      user_name: user,
+      points: pts,
+      reason: reason || null,
+      given_by: typeof currentUser !== 'undefined' ? currentUser : null
+    });
+    document.getElementById('mpPoints').value = '';
+    document.getElementById('mpReason').value = '';
+    loadLeaderboard();
+    loadManualPointsLog();
+  }catch(e){
+    alert('Konnte nicht gespeichert werden — nochmal versuchen.');
+  }
+}
+
+async function loadManualPointsLog(){
+  const el = document.getElementById('mpLog');
+  if(!el) return;
+  const { data } = await sb.from('manual_points').select('user_name,points,reason,given_by,created_at').order('created_at', { ascending: false }).limit(15);
+  if(!data || data.length === 0){
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = data.map(row => `
+    <div class="si-board-row">
+      <span>${row.points > 0 ? '➕' : '➖'} ${row.user_name}${row.reason ? ' — ' + row.reason : ''}</span>
+      <span>${row.points > 0 ? '+' : ''}${row.points}</span>
+    </div>
+  `).join('');
+}
+loadManualPointsLog();
 
 tryAutoLogin();
 
