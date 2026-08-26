@@ -563,6 +563,23 @@
     background:rgba(201,162,39,0.15); border:1px solid rgba(201,162,39,0.35);
     color:var(--brass); border-radius:12px; padding:3px 9px;
   }
+  .joystick-wrap{
+    width:100%; max-width:420px; display:flex; justify-content:center;
+    margin-top:14px; touch-action:none;
+  }
+  .joystick-base{
+    width:140px; height:140px; border-radius:50%;
+    background:rgba(255,255,255,0.04); border:2px solid var(--brass-dim);
+    position:relative; touch-action:none;
+  }
+  .joystick-knob{
+    width:56px; height:56px; border-radius:50%;
+    background:rgba(122,150,180,0.55); border:2px solid #7a96b4;
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+  }
+
   .esc-actions{
     width:100%; max-width:420px; display:flex; gap:10px; margin-top:12px;
   }
@@ -742,10 +759,10 @@
   <canvas id="escCanvas" width="340" height="300"></canvas>
   <div class="si-status" id="escStatus">Level 1 · Punkte: 0 · x1.00</div>
   <div class="esc-gear" id="escGearBar"></div>
-  <div class="snake-dpad">
-    <div></div><button class="si-btn" id="escUp">▲</button><div></div>
-    <button class="si-btn" id="escLeft">◀</button><div></div><button class="si-btn" id="escRight">▶</button>
-    <div></div><button class="si-btn" id="escDown">▼</button><div></div>
+  <div class="joystick-wrap">
+    <div class="joystick-base" id="escJoyBase">
+      <div class="joystick-knob" id="escJoyKnob"></div>
+    </div>
   </div>
   <div class="esc-actions">
     <button class="si-btn" id="escSneak" style="flex:1;">🥷 Schleichen: AUS</button>
@@ -3682,19 +3699,24 @@ window.closeGameHub = function(){
   }
 
   function draw(){
-    ctx.fillStyle = '#05080c';
+    ctx.fillStyle = '#100c08';
     ctx.fillRect(0, 0, cols*CELL, rows*CELL);
+
+    // Bodenfliesen-Muster (dezent), damit's wie ein Grundriss statt Labyrinth wirkt
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+    for(let x = 0; x <= cols; x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,rows*CELL); ctx.stroke(); }
+    for(let y = 0; y <= rows; y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(cols*CELL,y*CELL); ctx.stroke(); }
 
     for(let y = 0; y < rows; y++){
       for(let x = 0; x < cols; x++){
         if(HOUSE[y][x] === '#'){
-          ctx.fillStyle = 'rgba(44,107,102,0.4)';
+          ctx.fillStyle = 'rgba(120,100,80,0.55)';
           ctx.fillRect(x*CELL, y*CELL, CELL, CELL);
         }
       }
     }
 
-    ctx.fillStyle = '#2c6b66';
+    ctx.fillStyle = 'rgba(122,168,74,0.55)';
     ctx.fillRect(EXTRACTION.x*CELL+2, EXTRACTION.y*CELL+2, CELL-4, CELL-4);
     ctx.fillStyle = '#efe6d3';
     ctx.font = '12px sans-serif';
@@ -3715,30 +3737,63 @@ window.closeGameHub = function(){
 
     guards.forEach(g => {
       const distracted = Date.now() < g.distractedUntil;
-      ctx.fillStyle = distracted ? '#2c6b66' : '#8c2f1b';
-      ctx.fillRect(g.x*CELL+3, g.y*CELL+3, CELL-6, CELL-6);
       if(!distracted){
-        ctx.fillStyle = 'rgba(140,47,27,0.18)';
+        const pulse = 0.38 + Math.sin(Date.now()/250) * 0.08;
         const r = effectiveSightRange(g);
+        const coneFill = `rgba(220,60,40,${pulse})`;
+        const coneBorder = 'rgba(255,120,90,0.9)';
         if(g.axis === 'h'){
-          const x0 = g.dir === 1 ? g.x+1 : g.x-r;
           for(let i = 0; i <= r; i++){
             const xx = g.dir === 1 ? g.x+1+i : g.x-1-i;
             if(isWall(xx, g.y)) break;
+            ctx.fillStyle = coneFill;
             ctx.fillRect(xx*CELL, g.y*CELL, CELL, CELL);
+            ctx.strokeStyle = coneBorder;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(xx*CELL+0.5, g.y*CELL+0.5, CELL-1, CELL-1);
           }
         } else {
           for(let i = 0; i <= r; i++){
             const yy = g.dir === 1 ? g.y+1+i : g.y-1-i;
             if(isWall(g.x, yy)) break;
+            ctx.fillStyle = coneFill;
             ctx.fillRect(g.x*CELL, yy*CELL, CELL, CELL);
+            ctx.strokeStyle = coneBorder;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(g.x*CELL+0.5, yy*CELL+0.5, CELL-1, CELL-1);
           }
         }
       }
+      ctx.fillStyle = distracted ? '#2c6b66' : '#8c2f1b';
+      ctx.fillRect(g.x*CELL+3, g.y*CELL+3, CELL-6, CELL-6);
     });
 
-    ctx.fillStyle = sneaking ? 'rgba(201,162,39,0.6)' : '#c9a227';
-    ctx.fillRect(player.x*CELL+4, player.y*CELL+4, CELL-8, CELL-8);
+    const pcx = player.x*CELL + CELL/2, pcy = player.y*CELL + CELL/2;
+    const playerColor = sneaking ? 'rgba(122,150,180,0.65)' : '#7a96b4';
+
+    // Körper (Kreis)
+    ctx.fillStyle = playerColor;
+    ctx.beginPath();
+    ctx.arc(pcx, pcy, CELL*0.36, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#c8d4e0';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Blickrichtungs-Dreieck ("Nase")
+    const fx = facing.x, fy = facing.y;
+    if(fx !== 0 || fy !== 0){
+      const noseLen = CELL*0.5, noseWidth = CELL*0.22;
+      const tipX = pcx + fx*noseLen, tipY = pcy + fy*noseLen;
+      const perpX = -fy*noseWidth, perpY = fx*noseWidth;
+      ctx.fillStyle = '#efe6d3';
+      ctx.beginPath();
+      ctx.moveTo(tipX, tipY);
+      ctx.lineTo(pcx + perpX*0.4, pcy + perpY*0.4);
+      ctx.lineTo(pcx - perpX*0.4, pcy - perpY*0.4);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life -= 1; });
     particles = particles.filter(p => p.life > 0);
@@ -3747,10 +3802,53 @@ window.closeGameHub = function(){
     ctx.globalAlpha = 1;
   }
 
-  document.getElementById('escUp').addEventListener('pointerdown', ()=> nextDir = { x:0, y:-1 });
-  document.getElementById('escDown').addEventListener('pointerdown', ()=> nextDir = { x:0, y:1 });
-  document.getElementById('escLeft').addEventListener('pointerdown', ()=> nextDir = { x:-1, y:0 });
-  document.getElementById('escRight').addEventListener('pointerdown', ()=> nextDir = { x:1, y:0 });
+  function pressDir(key, dir){ nextDir = dir; }
+  function releaseDir(){ nextDir = { x:0, y:0 }; }
+
+  // Virtueller Joystick: ziehen für Richtung, loslassen = sofort stoppen
+  const joyBase = document.getElementById('escJoyBase');
+  const joyKnob = document.getElementById('escJoyKnob');
+  let joyActive = false, joyPointerId = null;
+  const JOY_MAX = 45; // max. Auslenkung in px
+  const JOY_DEADZONE = 12;
+
+  function joyMove(clientX, clientY){
+    const rect = joyBase.getBoundingClientRect();
+    const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+    let dx = clientX - cx, dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    const clamped = Math.min(dist, JOY_MAX);
+    const angle = Math.atan2(dy, dx);
+    const kx = Math.cos(angle) * clamped, ky = Math.sin(angle) * clamped;
+    joyKnob.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
+
+    if(dist < JOY_DEADZONE){ nextDir = { x:0, y:0 }; return; }
+    // Dominante Achse bestimmen (Gitterbewegung, kein echtes Analog nötig)
+    if(Math.abs(dx) > Math.abs(dy)){ nextDir = { x: dx > 0 ? 1 : -1, y: 0 }; }
+    else { nextDir = { x: 0, y: dy > 0 ? 1 : -1 }; }
+  }
+
+  function joyReset(){
+    joyActive = false;
+    joyPointerId = null;
+    joyKnob.style.transform = 'translate(-50%,-50%)';
+    nextDir = { x:0, y:0 };
+  }
+
+  joyBase.addEventListener('pointerdown', e=>{
+    joyActive = true;
+    joyPointerId = e.pointerId;
+    joyBase.setPointerCapture(e.pointerId);
+    joyMove(e.clientX, e.clientY);
+  });
+  joyBase.addEventListener('pointermove', e=>{
+    if(!joyActive || e.pointerId !== joyPointerId) return;
+    joyMove(e.clientX, e.clientY);
+  });
+  joyBase.addEventListener('pointerup', joyReset);
+  joyBase.addEventListener('pointercancel', joyReset);
+  joyBase.addEventListener('pointerleave', e=>{ if(joyActive) joyReset(); });
+
   document.getElementById('escSneak').addEventListener('click', ()=>{ sneaking = !sneaking; updateStatus(); });
   document.getElementById('escGrenade').addEventListener('click', throwGrenade);
   document.getElementById('escCashoutBtn').addEventListener('click', doCashout);
@@ -3758,23 +3856,60 @@ window.closeGameHub = function(){
 
   window.addEventListener('keydown', e=>{
     if(!document.getElementById('escOverlay').classList.contains('show')) return;
-    if(e.key === 'ArrowUp') nextDir = { x:0, y:-1 };
-    if(e.key === 'ArrowDown') nextDir = { x:0, y:1 };
-    if(e.key === 'ArrowLeft') nextDir = { x:-1, y:0 };
-    if(e.key === 'ArrowRight') nextDir = { x:1, y:0 };
+    if(e.key === 'ArrowUp') pressDir(null, {x:0,y:-1});
+    if(e.key === 'ArrowDown') pressDir(null, {x:0,y:1});
+    if(e.key === 'ArrowLeft') pressDir(null, {x:-1,y:0});
+    if(e.key === 'ArrowRight') pressDir(null, {x:1,y:0});
     if(e.key === 'g' || e.key === 'G') throwGrenade();
   });
+  window.addEventListener('keyup', e=>{
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) releaseDir();
+  });
+
+  function showIntro(){
+    running = false;
+    ctx.fillStyle = 'rgba(3,6,10,0.92)';
+    ctx.fillRect(0, 0, cols*CELL, rows*CELL);
+    ctx.fillStyle = '#c9a227';
+    ctx.font = "bold 15px 'JetBrains Mono', monospace";
+    ctx.textAlign = 'center';
+    ctx.fillText('🎒 ESCAPE FROM HOME', cols*CELL/2, 40);
+    ctx.font = "11px 'JetBrains Mono', monospace";
+    ctx.fillStyle = '#efe6d3';
+    const lines = [
+      'Ziel: Loot sammeln, Wachen',
+      'ausweichen, zur Tür 🚪 fliehen.',
+      '',
+      'Rote Zone = Sichtkegel der Wache.',
+      'Rein = erwischt, alles verloren!',
+      '',
+      '🥷 Schleichen = langsamer, unauffälliger',
+      '💣 Granate = lenkt Wachen kurz ab',
+      '',
+      'An der Tür: sicher auszahlen',
+      'oder weiterziehen fürs Risiko?',
+      '',
+      'Antippen zum Start'
+    ];
+    let y = 65;
+    lines.forEach(line => { ctx.fillText(line, cols*CELL/2, y); y += 16; });
+
+    canvas.addEventListener('pointerdown', function handler(){
+      canvas.removeEventListener('pointerdown', handler);
+      running = true;
+      draw();
+      loopId = requestAnimationFrame(step);
+      if(guardLoopId) clearInterval(guardLoopId);
+      guardLoopId = setInterval(moveGuards, 500);
+    }, { once: true });
+  }
 
   window.openEscapeHome = async function(){
     document.getElementById('escOverlay').classList.add('show');
     closeDecisionUI();
     await initGame();
     loadGameBoard('escape_home', 'escBoardList');
-    draw();
-    running = true;
-    loopId = requestAnimationFrame(step);
-    if(guardLoopId) clearInterval(guardLoopId);
-    guardLoopId = setInterval(moveGuards, 500);
+    showIntro();
   };
   window.closeEscapeHome = function(){
     running = false;
