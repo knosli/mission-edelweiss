@@ -3700,7 +3700,8 @@ window.closeGameHub = function(){
     flashlight: { label: 'Taschenlampe', icon: '🔦' },
     boots:      { label: 'Leise Schuhe', icon: '🥾' },
     radio:      { label: 'Funkgerät',    icon: '📻' },
-    backpack:   { label: 'Rucksack',     icon: '🎒' }
+    backpack:   { label: 'Rucksack',     icon: '🎒' },
+    stopwatch:  { label: 'Stoppuhr',     icon: '⏱️' }
   };
 
   const START = { x: 1, y: 7 };
@@ -3776,7 +3777,7 @@ window.closeGameHub = function(){
   const TROPHY_DEFS = {
     unaufhaltsam: { label: 'Unaufhaltsam', icon: '🔥', desc: 'Level 8 in einem Lauf erreichen, ohne zwischendurch auszuzahlen. Effekt: Granaten-Maximum dauerhaft +1.' },
     knapp_davongekommen: { label: 'Knapp davongekommen', icon: '⏰', desc: 'Trotz Alarm erfolgreich extrahieren. Effekt: Alarm-Zustand wird künftig milder.' },
-    sammlerin: { label: 'Sammlerin', icon: '🏆', desc: 'Alle 4 Basis-Items gleichzeitig besitzen. Effekt: Bei Entdeckung 50% Chance, mitgenommene Ausrüstung trotzdem zu behalten.' },
+    sammlerin: { label: 'Sammlerin', icon: '🏆', desc: 'Alle 5 Basis-Items gleichzeitig besitzen. Effekt: Bei Entdeckung 50% Chance, mitgenommene Ausrüstung trotzdem zu behalten.' },
     gluckspilz: { label: 'Glückspilz', icon: '🍀', desc: '3 neue Items gleichzeitig in einem Lauf tragen. Effekt: +5 Punkte dauerhaft auf jede Auszahlung.' }
   };
   let running, waitingForRestart, decisionPending, decisionLocked, loopId, guardLoopId, lastTick;
@@ -3830,7 +3831,7 @@ window.closeGameHub = function(){
     PATROL_SEGMENTS = computePatrolSegments();
 
     const nGuards = Math.min(2 + Math.floor((level-1)/2), 5);
-    levelTimeLimit = Math.max(20, 60 - (level-1)*5);
+    levelTimeLimit = Math.max(20, 60 - (level-1)*5) + (broughtItems.includes('stopwatch') ? 20 : 0);
     levelTimeLeft = levelTimeLimit;
     alertActive = false;
     const alarmSirenEl = document.getElementById('escAlarmSirenPlayer');
@@ -3970,7 +3971,7 @@ window.closeGameHub = function(){
       <div style="font-size:11px; color:var(--text-mid); margin-bottom:10px;">Nicht Mitgenommenes bleibt sicher im Versteck — auch wenn du erwischt wirst.</div>
       ${ownedKeys.map(k => `
         <label style="display:flex; align-items:center; gap:10px; padding:8px 0; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-hi);">
-          <input type="checkbox" class="esc-loadout-check" data-key="${k}" checked style="width:18px; height:18px;">
+          <input type="checkbox" class="esc-loadout-check" data-key="${k}" style="width:18px; height:18px;">
           <span>${ITEM_DEFS[k].icon} ${ITEM_DEFS[k].label}</span>
         </label>
       `).join('')}
@@ -4169,6 +4170,7 @@ window.closeGameHub = function(){
   function openDecision(){
     decisionPending = true;
     decisionLocked = false;
+    running = false; // Spielschleife komplett anhalten — sonst erkennt sie "steht noch auf der Tür" erneut und öffnet das Menü doppelt
     if(level >= 8) awardTrophy('unaufhaltsam');
     if(alertActive) awardTrophy('knapp_davongekommen');
     const banked = Math.round(runPoints * multiplier);
@@ -4226,6 +4228,8 @@ window.closeGameHub = function(){
     updateStatus();
     renderGearBar();
     playWin();
+    running = true;
+    loopId = requestAnimationFrame(step);
   }
 
   function triggerCaught(){
@@ -4616,7 +4620,8 @@ window.closeGameHub = function(){
     flashlight: 'Erweitert deinen Sichtradius um 2 Felder + zeigt die komplette Patrouille-Route jeder Wache als Linie.',
     boots:      'Beim Schleichen: Wach-Sichtweite um 1 zusätzliches Feld reduziert.',
     radio:      '+1 Granate pro Lauf verfügbar.',
-    backpack:   'Start-Multiplikator beginnt bei x1.15 statt x1.00.'
+    backpack:   'Start-Multiplikator beginnt bei x1.15 statt x1.00.',
+    stopwatch:  '+20 Sekunden Bonuszeit auf jedes Level (z.B. Level 1: 80s statt 60s).'
   };
 
   function renderLegend(){
