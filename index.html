@@ -1203,7 +1203,7 @@ function initPhotoScratch(wrapId){
 
   canvas.addEventListener('pointerdown', e=>{ scratching = true; const p = pos(e); scratchAt(p.x, p.y); });
   window.addEventListener('pointerup', ()=>{ scratching = false; checkCleared(); });
-  canvas.addEventListener('pointermove', e=>{ if(!scratching) return; const p = pos(e); scratchAt(p.x, p.y); });
+  canvas.addEventListener('pointermove', e=>{ if(!scratching) return; const p = pos(e); scratchAt(p.x, p.y); checkCleared(); });
   canvas.addEventListener('pointerleave', ()=> checkCleared());
   window.addEventListener('resize', resize);
   setTimeout(resize, 60);
@@ -2557,6 +2557,7 @@ function initScratch(wrap, d){
     if(!scratching) return;
     const p = pos(e);
     scratchAt(p.x,p.y);
+    checkCleared();
   });
   canvas.addEventListener('pointerleave', ()=> checkCleared());
 
