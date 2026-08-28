@@ -1703,6 +1703,11 @@ function renderGalleryPhoto(){
   document.getElementById('galleryImg').src = p.photo_url;
   document.getElementById('galleryCaption').textContent = `${p.user_name} — ${p.task}`;
   document.getElementById('galleryCounter').textContent = `${galleryIndex + 1} / ${galleryPhotos.length}`;
+  const deleteBtn = document.getElementById('galleryDelete');
+  if(deleteBtn){
+    const isOwn = typeof currentUser !== 'undefined' && p.user_name === currentUser;
+    deleteBtn.style.display = isOwn ? 'flex' : 'none';
+  }
 }
 
 document.getElementById('galleryPrev').addEventListener('click', ()=>{
@@ -1719,6 +1724,10 @@ document.getElementById('galleryNext').addEventListener('click', ()=>{
 document.getElementById('galleryDelete').addEventListener('click', async ()=>{
   const p = galleryPhotos[galleryIndex];
   if(!p) return;
+  if(typeof currentUser === 'undefined' || p.user_name !== currentUser){
+    alert('Du kannst nur deine eigenen Fotos löschen.');
+    return;
+  }
   if(!confirm('Dieses Foto wirklich löschen?')) return;
 
   if(p.photo_path){
