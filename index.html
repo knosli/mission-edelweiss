@@ -1217,7 +1217,7 @@ function initPhotoScratch(wrapId){
 
 // Trigger-Zone: Wassen UR — letzter gemeinsamer Punkt vor der Abzweigung Furka/Gotthard
 const triggerPoint = { lat: 46.7052, lng: 8.5936 };
-const triggerRadiusKm = 4;
+const triggerRadiusKm = 8;
 let navTriggered = false;
 
 function haversineKm(lat1, lon1, lat2, lon2){
@@ -1351,9 +1351,7 @@ if('geolocation' in navigator){
   { enableHighAccuracy:true, maximumAge:15000, timeout:20000 });
 }
 
-// Sicherheitsnetz: falls GPS aus irgendeinem Grund nicht auslöst, spätestens 90 Min. nach Abfahrt
-const navFallback = new Date(tripStart.getTime() + 90*60000);
-setInterval(()=>{ if(new Date() >= navFallback) fireNavReveal(); }, 15000);
+// (Sicherheitsnetz entfernt — manuelle Auslösung über die Preview-Seite falls GPS nicht anspringt)
 
 // Testmodus: Seite mit ?test=1 öffnen, um den Reveal sofort zu sehen
 if(new URLSearchParams(location.search).get('test') === '1'){
