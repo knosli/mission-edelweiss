@@ -1130,6 +1130,11 @@ function initPhotoScratch(wrapId){
   wrap.style.position = 'relative';
   wrap.style.overflow = 'hidden';
 
+  const storageKey = 'scratchRevealed_' + (wrapId || 'routeScratchWrap');
+  let alreadyRevealed = false;
+  try{ alreadyRevealed = localStorage.getItem(storageKey) === '1'; }catch(e){}
+  if(alreadyRevealed) return; // Schon früher freigerubbelt — keine Abdeckung mehr aufbauen
+
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:grab; z-index:2;';
   wrap.appendChild(canvas);
@@ -1192,6 +1197,7 @@ function initPhotoScratch(wrapId){
     const ratio = cleared / (total / 13);
     if(ratio > 0.5){
       revealed = true;
+      try{ localStorage.setItem(storageKey, '1'); }catch(e){}
       canvas.style.transition = 'opacity 0.45s';
       canvas.style.opacity = '0';
       hint.style.transition = 'opacity 0.3s';
