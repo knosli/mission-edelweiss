@@ -2489,6 +2489,7 @@ function initScratch(wrap, d){
   const canvas = wrap.querySelector('canvas');
   const hint = wrap.querySelector('.scratch-hint');
   const body = wrap.querySelector('.reveal-body');
+  const storageKey = 'scratchRevealed_' + d.id;
 
   // size canvas to match rendered body
   const resize = ()=>{
@@ -2542,6 +2543,7 @@ function initScratch(wrap, d){
     const ratio = cleared/(total/17);
     if(ratio > 0.45){
       revealed = true;
+      try{ localStorage.setItem(storageKey, '1'); }catch(e){}
       canvas.style.transition = 'opacity 0.5s';
       canvas.style.opacity = '0';
       hint.style.opacity = '0';
@@ -2622,7 +2624,19 @@ function tick(){
       if(!revealFace.classList.contains('active')){
         revealFace.classList.add('active');
         lockedFace.classList.add('hide');
-        if(!d.noScratch) initScratch(wrap, d);
+        if(!d.noScratch){
+          let alreadyRevealed = false;
+          try{ alreadyRevealed = localStorage.getItem('scratchRevealed_' + d.id) === '1'; }catch(e){}
+          if(alreadyRevealed){
+            // Schon früher freigerubbelt — Canvas/Hinweis komplett aus dem DOM entfernen, nichts kann mehr im Weg sein
+            const canvasEl = wrap.querySelector('canvas');
+            const hintEl = wrap.querySelector('.scratch-hint');
+            if(canvasEl) canvasEl.remove();
+            if(hintEl) hintEl.remove();
+          } else {
+            initScratch(wrap, d);
+          }
+        }
         if(d.isRouteCard) initPhotoScratch('routeScratchWrap');
         if(d.isIntroVideo) setTimeout(loadIntroVideo, 300);
       }
@@ -2643,6 +2657,33 @@ function tick(){
 }
 tick();
 setInterval(tick, 1000);
+
+/* ---------- Auto-Reload beim Zurückkehren aus dem Hintergrund ----------
+   Android/iOS werfen Canvas- und Video-Inhalte manchmal raus, wenn die App
+   länger im Hintergrund war. Ohne Reload bleibt der Inhalt dann leer.
+   Deshalb: bei Rückkehr aus längerem Hintergrund automatisch neu laden. */
+let hiddenAt = null;
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'hidden'){
+    hiddenAt = Date.now();
+  } else if(document.visibilityState === 'visible' && hiddenAt){
+    const awayMs = Date.now() - hiddenAt;
+    hiddenAt = null;
+    // Nicht neu laden, falls gerade ein Spiel offen ist — sonst geht der Spielstand verloren
+    const gameOverlayIds = ['escOverlay', 'siOverlay', 'snakeOverlay', 'pacOverlay'];
+    const gameIsOpen = gameOverlayIds.some(id => {
+      const el = document.getElementById(id);
+      return el && el.classList.contains('show');
+    });
+    // Nicht neu laden, falls irgendwo unbestätigter Text eingetippt ist (Aufgabe, Arschkarte, Bonuspunkte-Grund, etc.)
+    const hasUnsavedText = Array.from(document.querySelectorAll('input[type="text"], input[type="number"], textarea'))
+      .some(el => el.value && el.value.trim().length > 0);
+    if(awayMs > 20000 && !gameIsOpen && !hasUnsavedText){ // länger als 20s weg -> sicherheitshalber neu laden
+      location.reload();
+    }
+  }
+});
+
 
 /* ---------- Master clock (Trip-Countdown) ---------- */
 function masterTick(){
